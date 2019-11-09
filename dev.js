@@ -74,7 +74,9 @@ const initializeDevEnv = () => {
 // Sets the Background color of the body HTML Element
 // @param {object} e - Event oject
 const setBackgroundColor = e => {
-    const val = e.target ? e.target.value : e;
+    const rawValue = e.target ? e.target.value : e;
+    const val = adjustColorDev(rawValue, {});
+    if(!val) throw new Error('Adjusting the Color requires a valid HEX, RGB, or RGBA value. Example: HEX: #FFF or #FFFFFF RGB: 255, 255, 255 RGBA 255, 255, 255, .5');
     if(val.includes('/')) {
         document.querySelector('body').style.backgroundImage = `url(${val})`;
         return saveDevData({backgroundColor: `url(${val})`});
@@ -93,8 +95,8 @@ const setBackgroundColor = e => {
             elem.style.color = val;
         });
         inputs.forEach((elem) => elem.style.border = `1px solid ${val}`);
-        input.value = val;
-        return saveDevData({backgroundColor: val});
+        input.value = rawValue;
+        return saveDevData({backgroundColor: rawValue});
     } catch(e) {
         console.error(e);
     }
@@ -280,7 +282,10 @@ const adjustColorDev = (color, {opacity, invert, type}) => {
             color = [color[0] + color[0], color[1] + color[1], color[2] + color[2]];
         } else if(color.length === 6) {
             color = [color[0] + color[1], color[2] + color[3], color[4] + color[5]];
-        } else {return false;}
+        } else {
+            console.error('A HEX value requires atleast 3 characters. Example: #fff or #ffffff');
+            return false;
+        }
         color = color.map(c => {return parseInt(c, 16)});
         color.push(1);
     // Color is an RGB value
@@ -288,8 +293,21 @@ const adjustColorDev = (color, {opacity, invert, type}) => {
         color = color.includes('rgba') ? color.slice(4) : color.slice(3);
         color = color.replace(/[\(\)]/g, '');
         color = color.split(',');
+        if(color.length < 3) {
+            console.error('An RGB value requires atleast 3 value. Example: 255, 255, 255');
+            return false;
+        }
+        if(color.length === 3) color.push(1);
+    } else if(color.includes(',')) {
+        color = color.split(',').map(c => c.trim());
+        if(color.length < 3) {
+            console.error('An RGB value requires atleast 3 value. Example: 255, 255, 255');
+            return false;
+        }
         if(color.length === 3) color.push(1);
     } else {
+        console.error('Adjusting the Color requires a valid HEX, RGB, or RGBA value', 
+            'Example: HEX: #FFF or #FFFFFF RGB: 255, 255, 255 RGBA 255, 255, 255, .5');
         return false;
     }
     // Convert all strings to numbers

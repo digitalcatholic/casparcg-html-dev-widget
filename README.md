@@ -5,7 +5,7 @@ The widget is made up of an HTML, CSS or SCSS, and JS file. Each file has some c
 Join the discussion on the [CasparCG Forum](https://casparcgforum.org/).
 
 ## Features
-Change the background color quickly without editing the CSS file.</br>
+Change the background color quickly using a HEX, RGB or, RGBA values without editing the CSS file.</br>
 Run Custom Commands from the widget. Eliminates the need for a ton of snippets or typing the function into the console.</br>
 Easily run the standard Play, Next, and Stop Commands.
 
