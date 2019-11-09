@@ -31,6 +31,12 @@ window.onload = () => {
 2. Open the dev.js file and edit `HTML_URL` and `STYLESHEET_URL` to the URL the these files will be served from.
 3. And your done! The data is stored in the browser's local storage so as long as you use the same URL for each graphic, your widget style and position should be persistent. 
 
+### Some Images of the Widget for Reference
+
+![Dev Tool Open](https://lh3.google.com/u/0/d/1lyPuaPwQnvj70QpCcf794DW7TyI3_ZdX=w1920-h937-iv1)
+![Dev Tool Shrunk](https://lh3.google.com/u/0/d/1M14a8c6cEwypb5Uf-YWSE0UdB2NHrDtU=w1920-h937-iv1)
+![Dev Tool Hidden](https://lh3.google.com/u/0/d/13uaK_ZGD76Ie6FeQoJxTBgX8YMretg0D=w1920-h937-iv1)
+
 ### Coming Soon
 A way to save and load update data from the widget. Would once again eliminate the need for numerous snippets.</br>
 

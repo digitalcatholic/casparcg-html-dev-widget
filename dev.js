@@ -36,10 +36,14 @@ const initializeDevEnv = () => {
 
         // Try to get and parse Dev Data
         try {
-            devData = localStorage.getItem('devData') ? JSON.parse(localStorage.getItem('devData')) : {};
+            if(!localStorage.length) throw new Error();
+            devData = JSON.parse(localStorage.getItem('devData'));
         } catch(e) {
-            if(!localStorage.getItem('devData')) return console.log('No Dev data saved')
-            console.log('Error finding Dev Data', e);
+            if(Object.keys(e).length) return console.log('Error finding Dev Data', e);
+            return console.warn(`
+Welcome to CasparCG HTML Developer Widget.
+To begin, simply click a playout command, enter a custom command, or set a background color using a HEX, RGB, or RGBA value.
+The position input can work with or without commas, a space is requred at minimum.`);
         }
 
         // If there is something in the devData object.
