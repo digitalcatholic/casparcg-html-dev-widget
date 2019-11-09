@@ -1,0 +1,155 @@
+/* Font from Google to clean up the text */
+@import url('https://fonts.googleapis.com/css?family=Catamaran:300&display=swap');
+
+/* Main div element */
+.dev-controller {
+    // Control Button Colors
+    $play: #29AF1D;
+    $next: #F7B92B;
+    $stop: #EB261F;
+
+    position: absolute;
+    bottom: 0;
+    margin: 1em;
+    padding: .25em;
+
+    input {
+        align-self: center;
+        border: none;
+        font-size: 1.25em;
+        margin: .1em 0;
+    }
+
+    button {
+        background-color: transparent;
+        font-size: 2.5em;
+        border: none;
+        font-size: 1.25em;
+        padding: 0;
+        margin: 0 auto;
+        text-align: center;
+    }
+
+    button, option, input, p {
+        font-family: 'Catamaran', 'Arial';
+    }
+    .play {
+        background-color: $play;
+        color: white
+    }
+
+    .next {
+        background-color: $next;
+        color: white;
+    }
+    .stop {
+        background-color: $stop;
+        color: white;
+    }
+
+    /* Used on the controls when remove background is called */
+    .transparent {
+        background-color: transparent;
+    }
+}
+
+/* Defines the element when open */
+.open {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    background-color: grey;
+
+    input, div, .span-columns {
+        grid-column: span 3;
+    }
+    div {
+        display: flex;
+        justify-content: space-between;
+    }
+    button {
+        color: white;
+    }
+    .hide:after {
+        content: 'Hide';
+    }
+    .shrink:after {
+        content: 'Shrink';
+    }
+    .invis:after {
+        content: 'Invis';
+    }
+    .controls {
+        display: flex;
+    }
+    .controls button {
+        font-size: 2em;
+        border-radius: 25px;
+        margin: .10em;
+        padding: 0 .5em;
+
+        &:nth-of-type(1):after {
+            content: 'Play';
+        }
+        &:nth-of-type(2):after {
+            content: 'Next';
+        }
+        &:nth-of-type(3):after {
+            content: 'Stop';
+        }
+    }
+    .options {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+/* Defines the element when hidden */
+.hide {
+    .hide:after {
+        content: 'H';
+    }
+    .shrink:after {
+        content: unset;
+    }
+    .controls, .options {
+        display: none;
+    }
+}
+
+/* Defines the element when shrunken */
+.shrink {
+    display: flex;
+    flex-direction: column;
+    .hide:after {
+        content: 'H';
+    }
+    .shrink:after {
+        content: 'S';
+    }
+    .invis:after {
+        content: 'I';
+    }
+    .options {
+        display: none;
+    }
+    .controls {
+        display: flex;
+        flex-direction: column;
+    }
+    .controls button {
+        font-size: 1em;
+        border-radius: 25px;
+        margin: .10em;
+        padding: 0 .5em;
+
+        &:nth-of-type(1):after {
+            content: 'P';
+        }
+        &:nth-of-type(2):after {
+            content: 'N';
+        }
+        &:nth-of-type(3):after {
+            content: 'S';
+        }
+    }
+}
