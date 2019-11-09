@@ -33,9 +33,9 @@ window.onload = () => {
 
 ### Some Images of the Widget for Reference
 
-![Dev Tool Open](https://lh3.google.com/u/0/d/1lyPuaPwQnvj70QpCcf794DW7TyI3_ZdX=w1920-h937-iv1)
-![Dev Tool Shrunk](https://lh3.google.com/u/0/d/1M14a8c6cEwypb5Uf-YWSE0UdB2NHrDtU=w1920-h937-iv1)
-![Dev Tool Hidden](https://lh3.google.com/u/0/d/13uaK_ZGD76Ie6FeQoJxTBgX8YMretg0D=w1920-h937-iv1)
+![Dev Tool Open](Screenshots/CasparCG_HTML_Dev_Widget_Hidden.jpg)
+![Dev Tool Shrunk](Screenshots/CasparCG_HTML_Dev_Widget_Shrunk.jpg)
+![Dev Tool Hidden](Screenshots/CasparCG_HTML_Dev_Widget_Hidden.jpg)
 
 ### Coming Soon
 A way to save and load update data from the widget. Would once again eliminate the need for numerous snippets.</br>
