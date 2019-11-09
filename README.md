@@ -33,7 +33,7 @@ window.onload = () => {
 
 ### Some Images of the Widget for Reference
 
-![Dev Tool Open](Screenshots/CasparCG_HTML_Dev_Widget_Hidden.jpg)
+![Dev Tool Open](Screenshots/CasparCG_HTML_Dev_Widget_Open.jpg)
 ![Dev Tool Shrunk](Screenshots/CasparCG_HTML_Dev_Widget_Shrunk.jpg)
 ![Dev Tool Hidden](Screenshots/CasparCG_HTML_Dev_Widget_Hidden.jpg)
 
