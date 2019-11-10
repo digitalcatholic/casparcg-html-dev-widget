@@ -7,9 +7,9 @@
     Got a cool addition, please reach out!
 */
 
-// Setup variables
-const HTML_URL = 'http://localhost:8082/HTML/DEV/dev.html';
-const STYLESHEET_URL = 'http://localhost:8082/STYLES/css/DEV/dev.css';
+// Setup variables - Change These
+const HTML_URL = '';
+const STYLESHEET_URL = '';
 
 // Data that is used to setup the widget
 let devData = {};
