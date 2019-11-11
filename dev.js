@@ -7,72 +7,67 @@
     Got a cool addition, please reach out!
 */
 
-// Setup variables - Change These
-const HTML_URL = '';
-const STYLESHEET_URL = '';
-
 // Data that is used to setup the widget
 let devData = {};
 
 // Initializes the Development Widget
 const initializeDevEnv = () => {
-    // Fetch the html that makes up the Dev Widget
-    return fetch(HTML_URL, {method: 'GET'})
-    .then(res => res.text())
-    .then(res => {
-        // Parse the Text as HTML
-        const parser = new DOMParser();
-        const html = parser.parseFromString(res, "text/html");
-        const devControls = html.querySelector('.dev-controller');
-        const link = document.createElement('link');
-        const body = document.querySelector('body');
+    try {
+        if(typeof ENV === undefined || ENV !== 'DEV') return console.warn('Template enviorment is not set to DEV');
+    } catch (error) {
+        return console.warn(error);
+    }
+    // Parse the Raw HTML as HTML Document
+    const parser = new DOMParser();
+    const widgetHTML = parser.parseFromString(RAW_HTML, "text/html");
+    const styleHTML = parser.parseFromString(RAW_STYLES, "text/html");
+    const devControls = widgetHTML.querySelector('.dev-controller');
+    const style = styleHTML.querySelector('style');
+    const body = document.querySelector('body');
+    
+    //Append and load the Style Sheet
+    document.querySelector('head').append(style);
+    // Append Dev Controls Widget
+    body.append(devControls);
 
-        link.rel = 'stylesheet';
-        link.href = STYLESHEET_URL;
-        // Append and load the Style Sheet
-        document.querySelector('head').append(link);
-        // Append Dev Controls Widget
-        body.append(devControls);
-
-        // Try to get and parse Dev Data
-        try {
-            if(!localStorage.length) throw new Error();
-            devData = JSON.parse(localStorage.getItem('devData'));
-        } catch(e) {
-            if(Object.keys(e).length) return console.log('Error finding Dev Data', e);
-            return console.warn(`
+    // Try to get and parse Dev Data
+    try {
+        if(!localStorage.length) throw new Error();
+        devData = JSON.parse(localStorage.getItem('devData'));
+    } catch(e) {
+        if(Object.keys(e).length) return console.log('Error finding Dev Data', e);
+        return console.warn(`
 Welcome to CasparCG HTML Developer Widget.
 To begin, simply click a playout command, enter a custom command, or set a background color using a HEX, RGB, or RGBA value.
 The position input can work with or without commas, a space is requred at minimum.`);
-        }
+    }
 
-        // If there is something in the devData object.
-        if(Object.keys(devData).length) {
-            if(devData.backgroundColor !== undefined) {
-                setBackgroundColor(devData.backgroundColor);
-            } 
-            if(devData.hideControls !== undefined && devData.hideControls) {
-                hideControls();
-            } else if(devData.shrinkControls !== undefined && devData.shrinkControls) {
-                shrinkControls();
-            }
-            if(devData.removeBackground !== undefined) removeBackground(devData.removeBackground); 
-            if(devData.customCommand) {
-                document.querySelector('#dev-custom-commands').value = devData.customCommand;
-            }
-            if(devData.position) {
-                moveWidget(devData.position);
-                // Sets the value of the select elements that position the widget
-                document.querySelector('.dev-controller .position').value = devData.position.reduce((acc, item, i) => {
-                    acc += item.substring(0, 1).toUpperCase() + item.substring(1) + ', ';
-                    if(i === devData.position.length - 1) acc = acc.slice(0, -2)
-                    return acc;
-                }, '');
-            }
-        } else {
-            console.log('No Dev Data', devData)
+    // If there is something in the devData object.
+    if(Object.keys(devData).length) {
+        if(devData.backgroundColor !== undefined) {
+            setBackgroundColor(devData.backgroundColor);
+        } 
+        if(devData.hideControls !== undefined && devData.hideControls) {
+            hideControls();
+        } else if(devData.shrinkControls !== undefined && devData.shrinkControls) {
+            shrinkControls();
         }
-    });
+        if(devData.removeBackground !== undefined) removeBackground(devData.removeBackground); 
+        if(devData.customCommand) {
+            document.querySelector('#dev-custom-commands').value = devData.customCommand;
+        }
+        if(devData.position) {
+            moveWidget(devData.position);
+            // Sets the value of the select elements that position the widget
+            document.querySelector('.dev-controller .position').value = devData.position.reduce((acc, item, i) => {
+                acc += item.substring(0, 1).toUpperCase() + item.substring(1) + ', ';
+                if(i === devData.position.length - 1) acc = acc.slice(0, -2)
+                return acc;
+            }, '');
+        }
+    } else {
+        console.log('No Dev Data', devData)
+    }
 }
 
 // Sets the Background color of the body HTML Element
@@ -236,6 +231,10 @@ const removeBackground = e => {
     }
 }
 
+const setElementProperties = data => {
+
+}
+
 // Compares two objects and returns a new update object
 // @param {object} obj1 - The new object
 // @param {obejct} obj2 - The old object to be updated
@@ -330,6 +329,184 @@ const adjustColorDev = (color, {opacity, invert, type}) => {
         return `rgba(${color[0]},${color[1]},${color[2]},${color[3]})`;
     }
 }
+/*
+
+*/
+
+const RAW_HTML = 
+`
+<!-- CasparCG HTML Tempalte Developer Widget -->
+<div class="dev-controller open">
+    <!-- Visibility Controls -->
+    <button class="hide" onclick="hideControls()"></button>
+    <button class="shrink" onclick="shrinkControls()"></button>
+    <button class="invis" onclick="removeBackground(event)"></button>
+    <!-- Template Options -->
+    <div class="options span-columns">
+        <input type="text" class="position" onblur="moveWidget(event)" placeholder="Top, Bottom, Right, Left"/>
+        <input id="dev-bkg-color" type="text" placeholder="Set Background Color" onblur="setBackgroundColor(event)"/>
+        <div class="custom-command">
+            <input id="dev-custom-commands" type="text" onblur="setCustomCommand(event)" placeholder="Custom Command"/>
+            <button type="button" onclick="runCustomCommand()">Run</button>
+        </div>
+    </div>
+    <!-- Playout Controls -->
+    <div class="controls span-columns">
+            <button class="play control" onclick="play()" ></button>
+            <button class="next control" onclick="next()" ></button>
+            <button class="stop control" onclick="stop()" ></button>
+        </div>
+</div>
+`
+
+/*
+
+*/
+const RAW_STYLES = 
+`
+<style>
+/* Font from Google to clean up the text */
+@import url("https://fonts.googleapis.com/css?family=Catamaran:300&display=swap");
+/* Main div element */
+.dev-controller {
+  position: absolute;
+  bottom: 0;
+  margin: 1em;
+  padding: 0.25em;
+  /* Used on the controls when remove background is called */
+}
+.dev-controller input {
+  align-self: center;
+  border: none;
+  font-size: 1.25em;
+  margin: 0.1em 0;
+}
+.dev-controller button {
+  background-color: transparent;
+  font-size: 2.5em;
+  border: none;
+  font-size: 1.25em;
+  padding: 0;
+  margin: 0 auto;
+  text-align: center;
+}
+.dev-controller button, .dev-controller option, .dev-controller input, .dev-controller p {
+  font-family: "Catamaran", "Arial";
+}
+.dev-controller .play {
+  background-color: #29AF1D;
+  color: white;
+}
+.dev-controller .next {
+  background-color: #F7B92B;
+  color: white;
+}
+.dev-controller .stop {
+  background-color: #EB261F;
+  color: white;
+}
+.dev-controller .transparent {
+  background-color: transparent;
+}
+
+/* Defines the element when open */
+.open {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  background-color: grey;
+}
+.open input, .open div, .open .span-columns {
+  grid-column: span 3;
+}
+.open div {
+  display: flex;
+  justify-content: space-between;
+}
+.open button {
+  color: white;
+}
+.open .hide:after {
+  content: "Hide";
+}
+.open .shrink:after {
+  content: "Shrink";
+}
+.open .invis:after {
+  content: "Invis";
+}
+.open .controls {
+  display: flex;
+}
+.open .controls button {
+  font-size: 2em;
+  border-radius: 25px;
+  margin: 0.1em;
+  padding: 0 0.5em;
+}
+.open .controls button:nth-of-type(1):after {
+  content: "Play";
+}
+.open .controls button:nth-of-type(2):after {
+  content: "Next";
+}
+.open .controls button:nth-of-type(3):after {
+  content: "Stop";
+}
+.open .options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+/* Defines the element when hidden */
+.hide .hide:after {
+  content: "H";
+}
+.hide .shrink:after {
+  content: unset;
+}
+.hide .controls, .hide .options {
+  display: none;
+}
+
+/* Defines the element when shrunken */
+.shrink {
+  display: flex;
+  flex-direction: column;
+}
+.shrink .hide:after {
+  content: "H";
+}
+.shrink .shrink:after {
+  content: "S";
+}
+.shrink .invis:after {
+  content: "I";
+}
+.shrink .options {
+  display: none;
+}
+.shrink .controls {
+  display: flex;
+  flex-direction: column;
+}
+.shrink .controls button {
+  font-size: 1em;
+  border-radius: 25px;
+  margin: 0.1em;
+  padding: 0 0.5em;
+}
+.shrink .controls button:nth-of-type(1):after {
+  content: "P";
+}
+.shrink .controls button:nth-of-type(2):after {
+  content: "N";
+}
+.shrink .controls button:nth-of-type(3):after {
+  content: "S";
+}
+
+</style>
+`
 
 // Loads the Dev Widget
 initializeDevEnv();
