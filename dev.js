@@ -7,6 +7,356 @@
     Got a cool addition, please reach out!
 */
 
+const DEVWIDGET = (function() {
+    let localENV = 'PROD',
+        devData = {};
+
+    function initializeDevEnv() {
+        const html = document.querySelector('html');
+
+        // Test the envioment variable to detemine if the widgit should continue loading.
+        try {
+            if(ENV !== 'DEV') return console.warn('Template enviorment is not set to DEV');
+        } catch (error) {
+            return console.error('No enviorment varaible set.')
+        }
+        
+        // attempt to load the widget
+        try {
+            
+            let head = html.querySelector('head'),
+                body = html.querySelector('body');
+
+            if(!head) head = html;
+            if(!body) body = html;
+
+            const parser = new DOMParser();
+
+            localENV = 'DEV';
+
+            // Check for a pre loaded Dev Controller
+            if(!html.querySelector('.dev-controller')) {
+                 // Parse the Raw HTML as HTML Document
+                const widgetHTML = parser.parseFromString(getRAWHTML(), "text/html");
+                body.append(widgetHTML.querySelector('.dev-controller'));
+            } else {
+                console.warn('An dev controller was pre-loaded in the DOM');
+            }
+            if(!head.querySelector('style.dev-controller-styles')) {
+                const styleHTML = parser.parseFromString(getRAWCSS(), "text/html"),
+                    style = styleHTML.querySelector('style');
+                style.classList.add('dev-controller-styles');
+                head.append(style);
+            }
+        } catch (error) {
+            return console.warn(error);
+        }
+
+        // Attempt to load data from the local storage
+        try {
+            if(!localStorage.length) throw new Error();
+            devData = JSON.parse(localStorage.getItem('devController'));
+            if(!Object.keys(devData).length) throw new Error({message: 'Dev Data storaged in local storage has no keys'}); 
+        } catch(e) {
+            if(Object.keys(e).length) return console.log('Error finding Dev Data', e);
+            return console.warn(`
+Welcome to CasparCG HTML Developer Widget.
+To begin, simply click a playout command, enter a custom command, or set a background color using a HEX, RGB, or RGBA value.
+The position input can work with or without commas, a space is required at minimum.`);
+        }
+        
+        // Call all the function there is data for
+        Object.keys(devData).forEach((key, index) => {
+            if(devData[key]) {
+                // Load the features required percieve persistance
+                switch(key) {
+                    case 'position': 
+                        setWidgetPosition(devData[key]);
+                        break;
+                    case 'backgroundColor': 
+                        setBackgroundColor(devData[key]);
+                        break;
+                    case 'display': 
+                        updateDisplay(devData[key]);
+                        break;
+                    case 'customControl': 
+                        updateCustomCommand(devData[key]);
+                        break;
+                }
+            } else {
+                console.warn(`Dev Data has an invalid or null value for key: ${key}, ${devData[key]}`);
+            }
+        });
+    }
+
+    initializeDevEnv();
+
+    // Sets the widgets position on the screen. 
+    //Can exept Top, Bottom, Right, Left, and or a set of pixel values
+    // @param {object} top, right - The positions of the widget
+    function setWidgetPosition(positions) {
+        try {
+            const devController = document.querySelector('.dev-controller');
+            const devControllerSize = {
+                width: parseInt(getComputedStyle(devController).width),
+                height: parseInt(getComputedStyle(devController).height)
+            };
+            const convertEmToPx = em => {
+                if(typeof em === 'string') em = parseFloat(em);
+                return em * parseInt(getComputedStyle(devController).fontSize)
+            },
+            convertRemToPx = rem => {
+                if(typeof rem === 'string') rem = parseFloat(rem);
+                return rem *  parseInt(getComputedStyle(document.querySelector('html')).fontSize)
+            }
+            let convertedPostions = {
+                top: 0,
+                left: 0
+            };
+            if(typeof positions === 'string') {
+                if(positions.indexOf(/,|\s/g)) {
+                    positions = positions.split(/,|\s/g).slice(0,2).map(i => i.trim());
+                } else {
+                    positions = [positions, 0];
+                }
+                positions.forEach((item, i) => {
+                    if(item.indexOf('rem') > 0) {
+                        item = item.substring(0, item.indexOf('rem'));
+                        convertedPostions[Object.keys(convertedPostions)[i]] = 
+                            convertRemToPx(item.substring(0, item.indexOf('rem')));
+                    } else if(item.indexOf('em') > 0) {
+                        convertedPostions[Object.keys(convertedPostions)[i]] = 
+                            convertEmToPx(item.substring(0, item.indexOf('em')));
+                    } else if(item.indexOf('px') > 0) {
+                        convertedPostions[Object.keys(convertedPostions)[i]] = item.substring(0, item.indexOf('px'));
+                    } else {
+                        //Keyword Check - Options: Top, Center, Bottom, Left, Right
+                        switch(item) {
+                            case 'center':
+                                convertedPostions[Object.keys(convertedPostions)[i]] = 
+                                    i === 0 ? window.innerHeight / 2 : window.innerWidth / 2;
+                                break;
+                            case 'bottom':
+                                convertedPostions[Object.keys(convertedPostions)[i]] = window.innerHeight - devController.clientHeight;
+                                break;
+                            case 'right':
+                                    convertedPostions[Object.keys(convertedPostions)[i]] = window.innerWidth - devController.clientWidth;
+                                    break;
+                                default: 
+                                    convertedPostions[Object.keys(convertedPostions)[i]] = 0;
+                                    break;
+                        }
+                    }
+                   if(convertedPostions[Object.keys(convertedPostions)[i]] < 0) 
+                        convertedPostions[Object.keys(convertedPostions)[i]] = 0;
+                });
+                if(convertedPostions.top > window.innerHeight - devController.clientHeight) 
+                    convertedPostions.top = window.innerHeight - devController.clientHeight;
+                if(convertedPostions.left > window.innerWidth - devController.clientWidth)
+                    convertedPostions.left = window.innerWidth - devController.clientWidth;
+            }
+
+            devController.style.top = convertedPostions.top + 'px';
+            devController.style.left = convertedPostions.left + 'px';
+
+            console.log(convertedPostions, positions, window.innerWidth - devController.clientWidth)
+            //  [top, right].reduce((acc, item, i) => {
+            //     if(item.length && (typeof item === 'string' || !isNaN(item))) {
+            //         acc[Object.keys(acc)[i]] = item;
+            //     } else {
+            //         acc[Object.keys(acc)[i]] = 0;
+            //     }
+            //     return acc;
+            // }, {top: '', right: ''});
+            // Object.keys(positions).forEach((key, i) => {
+                
+            // })
+        } catch (error) {
+            let message = typeof error === 'object' ? error.message : error;
+            return console.error(`There was an error setting the widgets positions. ${message}`);
+        }
+    }
+
+    function getRAWHTML() {
+        return `
+<!-- CasparCG HTML Tempalte Developer Widget -->
+<div class="dev-controller open">
+    <!-- Visibility Controls -->
+    <button class="hide" onclick="hideControls()"></button>
+    <button class="shrink" onclick="shrinkControls()"></button>
+    <button class="invis" onclick="removeBackground(event)"></button>
+    <!-- Template Options -->
+    <div class="options span-columns">
+        <input type="text" class="position" onblur="moveWidget(event)" placeholder="Top, Bottom, Right, Left"/>
+        <input id="dev-bkg-color" type="text" placeholder="Set Background Color" onblur="setBackgroundColor(event)"/>
+        <div class="custom-command">
+            <input id="dev-custom-commands" type="text" onblur="setCustomCommand(event)" placeholder="Custom Command"/>
+            <button type="button" onclick="runCustomCommand()">Run</button>
+        </div>
+    </div>
+    <!-- Playout Controls -->
+    <div class="controls span-columns">
+            <button class="play control" ></button>
+            <button class="next control" onclick="next()" ></button>
+            <button class="stop control" onclick="stop()" ></button>
+        </div>
+</div>
+`
+    }
+
+    function getRAWCSS() {
+        return `
+<style>
+/* Font from Google to clean up the text */
+@import url("https://fonts.googleapis.com/css?family=Catamaran:300&display=swap");
+/* Main div element */
+.dev-controller {
+    position: absolute;
+    margin: 1em;
+    padding: 0.25em;
+    /* Used on the controls when remove background is called */
+}
+.dev-controller input {
+    align-self: center;
+    border: none;
+    font-size: 1.25em;
+    margin: 0.1em 0;
+}
+.dev-controller button {
+    background-color: transparent;
+    font-size: 2.5em;
+    border: none;
+    font-size: 1.25em;
+    padding: 0;
+    margin: 0 auto;
+    text-align: center;
+}
+.dev-controller button, .dev-controller option, .dev-controller input, .dev-controller p {
+    font-family: "Catamaran", "Arial";
+}
+.dev-controller .play {
+    background-color: #29AF1D;
+    color: white;
+}
+.dev-controller .next {
+    background-color: #F7B92B;
+    color: white;
+}
+.dev-controller .stop {
+    background-color: #EB261F;
+    color: white;
+}
+.dev-controller .transparent {
+    background-color: transparent;
+}
+
+/* Defines the element when open */
+.open {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    background-color: grey;
+}
+.open input, .open div, .open .span-columns {
+    grid-column: span 3;
+}
+.open div {
+    display: flex;
+    justify-content: space-between;
+}
+.open button {
+    color: white;
+}
+.open .hide:after {
+    content: "Hide";
+}
+.open .shrink:after {
+    content: "Shrink";
+}
+.open .invis:after {
+    content: "Invis";
+}
+.open .controls {
+    display: flex;
+}
+.open .controls button {
+    font-size: 2em;
+    border-radius: 25px;
+    margin: 0.1em;
+    padding: 0 0.5em;
+}
+.open .controls button:nth-of-type(1):after {
+    content: "Play";
+}
+.open .controls button:nth-of-type(2):after {
+    content: "Next";
+}
+.open .controls button:nth-of-type(3):after {
+    content: "Stop";
+}
+.open .options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+}
+
+/* Defines the element when hidden */
+.hide .hide:after {
+    content: "H";
+}
+.hide .shrink:after {
+    content: unset;
+}
+.hide .controls, .hide .options {
+    display: none;
+}
+
+/* Defines the element when shrunken */
+.shrink {
+    display: flex;
+    flex-direction: column;
+}
+.shrink .hide:after {
+    content: "H";
+}
+.shrink .shrink:after {
+    content: "S";
+}
+.shrink .invis:after {
+    content: "I";
+}
+.shrink .options {
+    display: none;
+}
+.shrink .controls {
+    display: flex;
+    flex-direction: column;
+}
+.shrink .controls button {
+    font-size: 1em;
+    border-radius: 25px;
+    margin: 0.1em;
+    padding: 0 0.5em;
+}
+.shrink .controls button:nth-of-type(1):after {
+    content: "P";
+}
+.shrink .controls button:nth-of-type(2):after {
+    content: "N";
+}
+.shrink .controls button:nth-of-type(3):after {
+    content: "S";
+}
+
+</style>
+`
+    }
+
+    return {
+        sayHi: function() {
+            console.log('say hi')
+        } 
+    }
+}());
+
 // Data that is used to setup the widget
 let devData = {};
 
@@ -333,180 +683,6 @@ const adjustColorDev = (color, {opacity, invert, type}) => {
 
 */
 
-const RAW_HTML = 
-`
-<!-- CasparCG HTML Tempalte Developer Widget -->
-<div class="dev-controller open">
-    <!-- Visibility Controls -->
-    <button class="hide" onclick="hideControls()"></button>
-    <button class="shrink" onclick="shrinkControls()"></button>
-    <button class="invis" onclick="removeBackground(event)"></button>
-    <!-- Template Options -->
-    <div class="options span-columns">
-        <input type="text" class="position" onblur="moveWidget(event)" placeholder="Top, Bottom, Right, Left"/>
-        <input id="dev-bkg-color" type="text" placeholder="Set Background Color" onblur="setBackgroundColor(event)"/>
-        <div class="custom-command">
-            <input id="dev-custom-commands" type="text" onblur="setCustomCommand(event)" placeholder="Custom Command"/>
-            <button type="button" onclick="runCustomCommand()">Run</button>
-        </div>
-    </div>
-    <!-- Playout Controls -->
-    <div class="controls span-columns">
-            <button class="play control" onclick="play()" ></button>
-            <button class="next control" onclick="next()" ></button>
-            <button class="stop control" onclick="stop()" ></button>
-        </div>
-</div>
-`
-
-/*
-
-*/
-const RAW_STYLES = 
-`
-<style>
-/* Font from Google to clean up the text */
-@import url("https://fonts.googleapis.com/css?family=Catamaran:300&display=swap");
-/* Main div element */
-.dev-controller {
-  position: absolute;
-  bottom: 0;
-  margin: 1em;
-  padding: 0.25em;
-  /* Used on the controls when remove background is called */
-}
-.dev-controller input {
-  align-self: center;
-  border: none;
-  font-size: 1.25em;
-  margin: 0.1em 0;
-}
-.dev-controller button {
-  background-color: transparent;
-  font-size: 2.5em;
-  border: none;
-  font-size: 1.25em;
-  padding: 0;
-  margin: 0 auto;
-  text-align: center;
-}
-.dev-controller button, .dev-controller option, .dev-controller input, .dev-controller p {
-  font-family: "Catamaran", "Arial";
-}
-.dev-controller .play {
-  background-color: #29AF1D;
-  color: white;
-}
-.dev-controller .next {
-  background-color: #F7B92B;
-  color: white;
-}
-.dev-controller .stop {
-  background-color: #EB261F;
-  color: white;
-}
-.dev-controller .transparent {
-  background-color: transparent;
-}
-
-/* Defines the element when open */
-.open {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  background-color: grey;
-}
-.open input, .open div, .open .span-columns {
-  grid-column: span 3;
-}
-.open div {
-  display: flex;
-  justify-content: space-between;
-}
-.open button {
-  color: white;
-}
-.open .hide:after {
-  content: "Hide";
-}
-.open .shrink:after {
-  content: "Shrink";
-}
-.open .invis:after {
-  content: "Invis";
-}
-.open .controls {
-  display: flex;
-}
-.open .controls button {
-  font-size: 2em;
-  border-radius: 25px;
-  margin: 0.1em;
-  padding: 0 0.5em;
-}
-.open .controls button:nth-of-type(1):after {
-  content: "Play";
-}
-.open .controls button:nth-of-type(2):after {
-  content: "Next";
-}
-.open .controls button:nth-of-type(3):after {
-  content: "Stop";
-}
-.open .options {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-}
-
-/* Defines the element when hidden */
-.hide .hide:after {
-  content: "H";
-}
-.hide .shrink:after {
-  content: unset;
-}
-.hide .controls, .hide .options {
-  display: none;
-}
-
-/* Defines the element when shrunken */
-.shrink {
-  display: flex;
-  flex-direction: column;
-}
-.shrink .hide:after {
-  content: "H";
-}
-.shrink .shrink:after {
-  content: "S";
-}
-.shrink .invis:after {
-  content: "I";
-}
-.shrink .options {
-  display: none;
-}
-.shrink .controls {
-  display: flex;
-  flex-direction: column;
-}
-.shrink .controls button {
-  font-size: 1em;
-  border-radius: 25px;
-  margin: 0.1em;
-  padding: 0 0.5em;
-}
-.shrink .controls button:nth-of-type(1):after {
-  content: "P";
-}
-.shrink .controls button:nth-of-type(2):after {
-  content: "N";
-}
-.shrink .controls button:nth-of-type(3):after {
-  content: "S";
-}
-
-</style>
-`
 
 // Loads the Dev Widget
-initializeDevEnv();
+//initializeDevEnv();
