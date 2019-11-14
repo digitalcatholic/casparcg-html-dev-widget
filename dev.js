@@ -7,18 +7,33 @@
     Got a cool addition, please reach out!
 */
 
+// Global variable that acts as API
 const DEVWIDGET = (function() {
     let localENV = 'PROD',
+        initialized = false,
         devData = {};
+
+    let dragging = false;
 
     function initializeDevEnv() {
         const html = document.querySelector('html');
 
         // Test the envioment variable to detemine if the widgit should continue loading.
         try {
-            if(ENV !== 'DEV') return console.warn('Template enviorment is not set to DEV');
+            if(window.location.search) {
+                // The url param to use to consider dev ENV
+                const regex = new RegExp('[\\?&]' + 'debug' + '=([^&#]*)');
+                const results = regex.exec(location.search);
+                const value = results === null ? false : decodeURIComponent(results[1].replace(/\+/g, ' '));
+                // Warn if debug was in the url and it was not set to DEV
+                if(value && value !== 'true')
+                    throw 'Template url is set to Production';
+            } else if(ENV !== 'DEV') {
+                throw new Error('Template enviorment is not set to DEV');
+            }
         } catch (error) {
-            return console.error('No enviorment varaible set.')
+                return typeof error === 'object' 
+                    ? console.error(error) : console.warn(error);  
         }
         
         // attempt to load the widget
@@ -34,19 +49,20 @@ const DEVWIDGET = (function() {
 
             localENV = 'DEV';
 
-            // Check for a pre loaded Dev Controller
-            if(!html.querySelector('.dev-controller')) {
+            // Check for a pre loaded Dev Widget
+            if(!html.querySelector('.dev-widget')) {
                  // Parse the Raw HTML as HTML Document
                 const widgetHTML = parser.parseFromString(getRAWHTML(), "text/html");
-                body.append(widgetHTML.querySelector('.dev-controller'));
+                body.append(widgetHTML.querySelector('.dev-widget'));
             } else {
-                console.warn('An dev controller was pre-loaded in the DOM');
+                console.warn('An dev widget was pre-loaded in the DOM');
             }
-            if(!head.querySelector('style.dev-controller-styles')) {
+            if(!head.querySelector('link[href*="dev.css"]')) {
                 const styleHTML = parser.parseFromString(getRAWCSS(), "text/html"),
                     style = styleHTML.querySelector('style');
-                style.classList.add('dev-controller-styles');
                 head.append(style);
+            } else {
+                console.warn('A dev.css file was pre-loaded in the DOM')
             }
         } catch (error) {
             return console.warn(error);
@@ -71,10 +87,10 @@ The position input can work with or without commas, a space is required at minim
                 // Load the features required percieve persistance
                 switch(key) {
                     case 'position': 
-                        setWidgetPosition(devData[key]);
+                        updateWidgetPosition(devData[key]);
                         break;
                     case 'backgroundColor': 
-                        setBackgroundColor(devData[key]);
+                        updateBackgroundColor(devData[key]);
                         break;
                     case 'display': 
                         updateDisplay(devData[key]);
@@ -87,41 +103,138 @@ The position input can work with or without commas, a space is required at minim
                 console.warn(`Dev Data has an invalid or null value for key: ${key}, ${devData[key]}`);
             }
         });
+
+        // Try and add all the event inital listeners for widget
+        try {
+            addAttrValues([
+                {
+                    elem: '.dev-widget-visibility button',
+                    all: true,
+                    event: true,
+                    attr: 'click',
+                    value: updateDisplay
+                }, {
+                    elem: ['.dev-widget-control', '.dev-widget-update'],
+                    all: [true, false],
+                    event: true,
+                    attr: 'click',
+                    value: runPlayoutCommand
+                }, {
+                    elem: '.dev-widget-position',
+                    event: true,
+                    attr: 'blur',
+                    value: updateWidgetPosition
+                }, {
+                    elem: '.dev-widget-background-color',
+                    event: true,
+                    attr: 'blur',
+                    value: updateBackgroundColor
+                } , {
+                    elem: '.dev-widget-custom-command',
+                    event: true,
+                    attr: 'blur',
+                    value: updateCustomCommand
+                }, {
+                    elem: ['.dev-widget-visibility button', '.dev-widget-position-con button'],
+                    event: true,
+                    all: [true, false],
+                    attr: 'mousedown',
+                    value: toggleDragWidget
+                }, {
+                    elem: '.dev-widget-widget',
+                    event: true,
+                    all: true,
+                    attr: 'mouseup',
+                    value: toggleDragWidget
+                }, {
+                    elem: window,
+                    event: true,
+                    attr: 'unload',
+                    value: () => saveWidgetData(devData)
+                }
+
+
+            ])
+        } catch (error) {
+            
+        }
+
+        initialized = true;
     }
 
     initializeDevEnv();
 
+    // Compares the update sent and current data and saves it to local storage
+    function saveWidgetData(update) {
+        if(!initialized) return;
+        devData = compareObjects(update, devData);
+        localStorage.setItem('devController', JSON.stringify(devData));
+    }
+
+    function updateDisplay(e) {
+        console.log(e)
+    }
+
+    function runPlayoutCommand(e) {
+        console.log(e)
+    }
+
     // Sets the widgets position on the screen. 
     //Can exept Top, Bottom, Right, Left, and or a set of pixel values
     // @param {object} top, right - The positions of the widget
-    function setWidgetPosition(positions) {
+    function updateWidgetPosition(positions) {
+        if(!positions) throw new Error('No positions passed to update widget position');
+        if(positions.target) positions = positions.target.value;
         try {
-            const devController = document.querySelector('.dev-controller');
-            const devControllerSize = {
-                width: parseInt(getComputedStyle(devController).width),
-                height: parseInt(getComputedStyle(devController).height)
-            };
+            const devController = document.querySelector('.dev-widget');
+            const input = document.querySelector('.dev-widget-position');
             const convertEmToPx = em => {
                 if(typeof em === 'string') em = parseFloat(em);
+                if(isNaN(em)) throw new Error('Can not parse em value');
                 return em * parseInt(getComputedStyle(devController).fontSize)
             },
             convertRemToPx = rem => {
                 if(typeof rem === 'string') rem = parseFloat(rem);
+                if(isNaN(rem)) throw new Error('Can not parse rem value');
                 return rem *  parseInt(getComputedStyle(document.querySelector('html')).fontSize)
             }
+            // The computed styles of the wdiget
+            const values = getElemComputedStyles({
+                elem: devController, 
+                attrs: ['width', 'height', 'margin-top', 'margin-left'], 
+                ops: 'all'
+            });
+
             let convertedPostions = {
                 top: 0,
                 left: 0
             };
+
+            // Get the widgets total sizes
+            values.totalHeight = values.height + values["margin-top"] * 4;
+            values.totalWidth = values.width + values["margin-left"] * 4;
+
             if(typeof positions === 'string') {
-                if(positions.indexOf(/,|\s/g)) {
-                    positions = positions.split(/,|\s/g).slice(0,2).map(i => i.trim());
+                // Chack for commas or spaces
+                if(positions.indexOf(',') > -1 || positions.indexOf(' ') > -1) {
+                    positions = positions.split(/,|\s/g).filter(i => i && i.trim()).slice(0,2);
                 } else {
-                    positions = [positions, 0];
+                    positions = [positions, positions];
                 }
-                positions.forEach((item, i) => {
+            } else if(typeof positions === 'object' && !Array.isArray(positions)) {
+                // Check for top and left values on the object, else set to 0
+                const arr = [];
+                arr[0] = positions.top ? positions.top : 0 ;
+                arr[1] = positions.left ? positions.left : 0;
+                positions = arr;
+            }
+
+            // For the top and left positions
+            positions.forEach((item, i) => {
+                // Check for REM, EM, or PX
+                if(isNaN(item)) {
+                item = item.toLowerCase();
                     if(item.indexOf('rem') > 0) {
-                        item = item.substring(0, item.indexOf('rem'));
                         convertedPostions[Object.keys(convertedPostions)[i]] = 
                             convertRemToPx(item.substring(0, item.indexOf('rem')));
                     } else if(item.indexOf('em') > 0) {
@@ -132,9 +245,15 @@ The position input can work with or without commas, a space is required at minim
                     } else {
                         //Keyword Check - Options: Top, Center, Bottom, Left, Right
                         switch(item) {
+                            case 'top':
+                            case 'left':
+                                    convertedPostions[Object.keys(convertedPostions)[i]] = 50;
+                                    break
                             case 'center':
                                 convertedPostions[Object.keys(convertedPostions)[i]] = 
-                                    i === 0 ? window.innerHeight / 2 : window.innerWidth / 2;
+                                    i === 0 
+                                        ? window.innerHeight / 2 - values.totalHeight / 2 
+                                        : window.innerWidth / 2 - values.totalWidth / 2;
                                 break;
                             case 'bottom':
                                 convertedPostions[Object.keys(convertedPostions)[i]] = window.innerHeight - devController.clientHeight;
@@ -142,40 +261,236 @@ The position input can work with or without commas, a space is required at minim
                             case 'right':
                                     convertedPostions[Object.keys(convertedPostions)[i]] = window.innerWidth - devController.clientWidth;
                                     break;
-                                default: 
-                                    convertedPostions[Object.keys(convertedPostions)[i]] = 0;
-                                    break;
+                            default: 
+                                throw `"${item}" is not a valid position or keyword`;
                         }
                     }
-                   if(convertedPostions[Object.keys(convertedPostions)[i]] < 0) 
-                        convertedPostions[Object.keys(convertedPostions)[i]] = 0;
-                });
-                if(convertedPostions.top > window.innerHeight - devController.clientHeight) 
-                    convertedPostions.top = window.innerHeight - devController.clientHeight;
-                if(convertedPostions.left > window.innerWidth - devController.clientWidth)
-                    convertedPostions.left = window.innerWidth - devController.clientWidth;
-            }
+                } else {
+                    convertedPostions[Object.keys(convertedPostions)[i]] = item;
+                }
+               if(convertedPostions[Object.keys(convertedPostions)[i]] < 0) 
+                    convertedPostions[Object.keys(convertedPostions)[i]] = 0;
+            });
+            if(convertedPostions.top > window.innerHeight - values.totalHeight) 
+                convertedPostions.top = window.innerHeight - values.totalHeight;
+            if(convertedPostions.left > window.innerWidth - values.totalWidth)
+                convertedPostions.left = window.innerWidth - values.totalWidth;
 
             devController.style.top = convertedPostions.top + 'px';
             devController.style.left = convertedPostions.left + 'px';
 
-            console.log(convertedPostions, positions, window.innerWidth - devController.clientWidth)
-            //  [top, right].reduce((acc, item, i) => {
-            //     if(item.length && (typeof item === 'string' || !isNaN(item))) {
-            //         acc[Object.keys(acc)[i]] = item;
-            //     } else {
-            //         acc[Object.keys(acc)[i]] = 0;
-            //     }
-            //     return acc;
-            // }, {top: '', right: ''});
-            // Object.keys(positions).forEach((key, i) => {
-                
-            // })
+            input.value = `${positions[0]}, ${positions[1]}`;
+
+            devData.position = {
+                top: convertedPostions.top,
+                left: convertedPostions.left
+            };
+
+            if(!dragging) {
+                console.log(`Widget is now positioned at ${devController.style.top} X / ${devController.style.left} Y.`);
+                return saveWidgetData({position: positions});
+            }
+
         } catch (error) {
             let message = typeof error === 'object' ? error.message : error;
             return console.error(`There was an error setting the widgets positions. ${message}`);
         }
     }
+
+    function dragWidget(e) {
+        if(dragging) return updateWidgetPosition([e.clientY - 20, e.clientX - 20]);
+    }
+
+    function toggleDragWidget(e) {
+        if(e.type === 'mousedown') {
+            dragging = true;
+            document.addEventListener('mousemove', dragWidget);
+        } else {
+            dragging = false;
+            document.removeEventListener('mousemove', dragWidget);
+        }
+    }
+
+    function updateBackgroundColor() {
+
+    }
+
+    function updateCustomCommand() {
+
+    }
+
+    /* Playout Controls
+
+    */
+
+    function play() {
+        console.log('play')
+    }
+
+    /* Helper Funtions
+        @function addStyleValues - Adds the width, height or both to a value
+        @function getElemComputedStyles 
+            - Returns the computed styles of an element as a total or object of all the values
+    */
+
+    //  Checks for spaces in a value and if they are found, splits and adds each value together
+    //  @param {string} value - The string to check for spaces or return as a number
+    //  @return {number} - The sum of the value passed in.
+    function addStyleValues(value, width, height) {
+        if(value.indexOf(' ') !== -1) {
+            const values = value.split(' ');
+            value = values.reduce((acc, val, index) => {
+                if(index % 2 !== 0 && !width) return acc;
+                if(index % 2 === 0 && !height) return acc;
+                acc = values.length === 2 ? acc + (Number(val)* 2) : acc + Number(val);
+                return acc;
+            }, 0);
+            return value;
+        } else {
+            return Number(value);
+        }
+    }
+
+
+    // Takes an element and returns the computed styles as a total or object of all the values
+    // @param {string || DOM node} elem - The elemnt to get the style from
+    // @param {string || array} attrs - The attribute/s that need to have their values computed
+    // @param {object} direction - The direction to compute. width or height
+    // @param {string} operation - The operation to perform on the attribute values
+    function getElemComputedStyles({elem, attrs, direction, ops}) {
+        if(!elem || !attrs) throw 'Missing element or attributes for getElemComputedStyles';
+        if(typeof elem === 'string') elem = document.querySelector(elem);
+        if(!direction) direction = {width: true, height: false};
+        const compStyles = window.getComputedStyle(elem);
+        try {
+            if(Array.isArray(attrs)) {
+                return attrs.reduce((acc, prop, i) => {
+                    const rawValue = compStyles.getPropertyValue(prop).replace(/px/g, '');
+                    const value = addStyleValues(rawValue, direction.width, direction.height);
+                    if(isNaN(value)) throw new Error(`${prop} could not be used`);
+                    const operation = Array.isArray(ops) && ops[i] 
+                        ? ops[i] : ops; 
+                    switch(operation) {
+                        case 'add': 
+                        default:
+                            acc.total += value;
+                            break;
+                        case 'subtract':
+                            acc.total -= value;
+                            break;
+                        case 'multiple':
+                            acc.total *= value;
+                            break;
+                        case 'divide': 
+                            acc.total /= value;
+                            break;
+                        case 'all':
+                            acc[prop] = value
+                            break;
+                    }
+                    return acc;
+                }, {total: 0});
+            } else {
+                return addStyleValues(compStyles.getPropertyValue(attrs).replace(/px/g, ''), direction.width, direction.height);
+            }
+        } catch (error) {
+            return console.error(error);
+        }
+    }
+
+    // Compares two objects and returns a new update object
+    // @param {object} obj1 - The new object
+    // @param {obejct} obj2 - The old object to be updated
+    // @returns {object} The updated object
+    const compareObjects = (obj1, obj2) => {
+        if(!obj1 || !obj2 | !Object.keys(obj1).length) return false;
+        // Loop through each item in the new object
+        return Object.keys(obj1).reduce((acc, key) => {
+            // If the item is a string
+            if(typeof obj1[key] !== 'object' && !Array.isArray(obj1[key])) {
+                // If the item is not null and does not equal the old object
+                if(obj1[key] !== null && obj1[key] !== obj2[key]) {
+                    acc[key] = obj1[key];
+                // If it is null, remove it
+                } else if(obj1[key] === null) {
+                    delete acc[key];
+                }
+            // If the item is an array
+            } else if(Array.isArray(obj1[key])) {
+                acc[key] = obj1[key];
+            // If the item is an object
+            } else if(typeof obj1[key] === 'object') {
+                // Create or get the sub object to be compared to
+                const hasSubObject = obj2[key] ? obj2[key] : {};
+                // Compare the sub objects
+                acc[key] = compareObjects(obj1[key], hasSubObject);
+            }
+            return acc;
+        // Start with the old object
+        }, obj2);
+    }
+
+    function checkElement(e, all) {
+        if(typeof e === 'string') {
+            if(all) {
+                return [...document.querySelectorAll(e)]
+            } else {
+                return [document.querySelector(e)];
+            }
+        } else if(Array.isArray(e)) {
+            return e.reduce((acc, item, i) => {
+                if(typeof item === 'string') {
+                    let checkAll = Array.isArray(all) ? all[i] : all
+                    if(checkAll) {
+                        acc.push(...document.querySelectorAll(e));
+                    } else {
+                        acc.push(document.querySelector(e));
+                    }
+                } else {
+                    acc.push(item);
+                }
+                return acc;
+            }, []);
+        } else {
+            return [e];
+        }
+    }
+
+    function addAttrValues(data) {
+        const findClosest = (arr, t) => Array.isArray(arr) 
+            ? arr.find((item, i) => i >= t) : arr;
+
+        if(Array.isArray(data)) {
+            try {
+                data.forEach((item, i) => {
+                    if(item.attr === undefined) throw new Error('Error with item in array: ' + item.attr);
+                    item.elem = checkElement(item.elem, item.all);
+                    item.elem.forEach((e,i) => {
+                        const attr = findClosest(item.attr, i);
+                        const value = findClosest(item.value, i);
+                        item.event ? e.addEventListener(attr, value) : e.addAttribute(attr, value);
+                    })
+                });
+            } catch (error) {
+                return console.error(error);
+            }
+        } else if(typeof data === 'object') {
+            try {
+                if(item.attr === undefined) throw new Error('Error with item in obj: ' + item.attr);
+                if(typeof item.elem === 'string') item.elem = document.querySelector(item.elem);
+                item.elem.addAttribute(item.attr, item.value);
+            } catch (error) {
+                return console.error(error);
+            }
+        } else {
+            return console.error(`Invalid data element: ${data}`);
+        }
+    }
+
+
+    /* 
+
+    */
 
     function getRAWHTML() {
         return `
@@ -206,219 +521,77 @@ The position input can work with or without commas, a space is required at minim
 
     function getRAWCSS() {
         return `
-<style>
-/* Font from Google to clean up the text */
-@import url("https://fonts.googleapis.com/css?family=Catamaran:300&display=swap");
-/* Main div element */
-.dev-controller {
-    position: absolute;
-    margin: 1em;
-    padding: 0.25em;
-    /* Used on the controls when remove background is called */
-}
-.dev-controller input {
-    align-self: center;
-    border: none;
-    font-size: 1.25em;
-    margin: 0.1em 0;
-}
-.dev-controller button {
-    background-color: transparent;
-    font-size: 2.5em;
-    border: none;
-    font-size: 1.25em;
-    padding: 0;
-    margin: 0 auto;
-    text-align: center;
-}
-.dev-controller button, .dev-controller option, .dev-controller input, .dev-controller p {
-    font-family: "Catamaran", "Arial";
-}
-.dev-controller .play {
-    background-color: #29AF1D;
-    color: white;
-}
-.dev-controller .next {
-    background-color: #F7B92B;
-    color: white;
-}
-.dev-controller .stop {
-    background-color: #EB261F;
-    color: white;
-}
-.dev-controller .transparent {
-    background-color: transparent;
-}
 
-/* Defines the element when open */
-.open {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    background-color: grey;
-}
-.open input, .open div, .open .span-columns {
-    grid-column: span 3;
-}
-.open div {
-    display: flex;
-    justify-content: space-between;
-}
-.open button {
-    color: white;
-}
-.open .hide:after {
-    content: "Hide";
-}
-.open .shrink:after {
-    content: "Shrink";
-}
-.open .invis:after {
-    content: "Invis";
-}
-.open .controls {
-    display: flex;
-}
-.open .controls button {
-    font-size: 2em;
-    border-radius: 25px;
-    margin: 0.1em;
-    padding: 0 0.5em;
-}
-.open .controls button:nth-of-type(1):after {
-    content: "Play";
-}
-.open .controls button:nth-of-type(2):after {
-    content: "Next";
-}
-.open .controls button:nth-of-type(3):after {
-    content: "Stop";
-}
-.open .options {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-}
-
-/* Defines the element when hidden */
-.hide .hide:after {
-    content: "H";
-}
-.hide .shrink:after {
-    content: unset;
-}
-.hide .controls, .hide .options {
-    display: none;
-}
-
-/* Defines the element when shrunken */
-.shrink {
-    display: flex;
-    flex-direction: column;
-}
-.shrink .hide:after {
-    content: "H";
-}
-.shrink .shrink:after {
-    content: "S";
-}
-.shrink .invis:after {
-    content: "I";
-}
-.shrink .options {
-    display: none;
-}
-.shrink .controls {
-    display: flex;
-    flex-direction: column;
-}
-.shrink .controls button {
-    font-size: 1em;
-    border-radius: 25px;
-    margin: 0.1em;
-    padding: 0 0.5em;
-}
-.shrink .controls button:nth-of-type(1):after {
-    content: "P";
-}
-.shrink .controls button:nth-of-type(2):after {
-    content: "N";
-}
-.shrink .controls button:nth-of-type(3):after {
-    content: "S";
-}
-
-</style>
 `
     }
 
     return {
-        sayHi: function() {
-            console.log('say hi')
-        } 
+        /*
+
+        */
+        // Returns the top and left positions
+        widgetPosition: function() {return devData.position},
+        // Set Widget position
+        setWidgetPosition: function(position) {
+            return updateWidgetPosition(position);
+        },
+        // Returns the background color as an rgba value
+        backgroundColor: function() {return devData.backgroundColor},
+        // Sets the background color
+        // @param {string} color - A HEX, RGB, or RGBA value that will be used to set the background color.
+        setBackgroundColor: function(color) {
+
+        },
+
+        /*
+
+        */
+        help: 
+        `
+We are here to help!
+Run .propYouWantHelpWith.helpType for more help with the value or method.
+Ex. DEVWIDGET.position.propHelp will tell you about the position value returned.
+    DEVWIDGET.position.methodHelp will tell you how to set the widget's position.
+
+The options are
+    .backgroundColor
+    .widgetBackgroundColor
+    .position
+`,
+        backgroundColor: {
+            propHelp: 
+`
+DEVWIDGET.backgroundcolor(asHEX)
+Returns the background color as an RGBA or HEX value
+`,
+            methodHelp: 
+`
+DEVWIDGET.setBackgroundcolor(color, {opacity, invert, type})
+    Adjusts then sets the color. A null or empty object will just set the background color.
+        color - The HEX, RGB, or RGBA value. EX: #123 or #131123 or 0,0,0 or 0,0,0,1 or rgb(0,0,0) or rgba(0,0,0,.5)
+        opacity - A percentage or 0 to 1 value.
+        invert - Will invert the color.
+        type - Forces the color to be a HEX value or RGB value.
+`
+        },
+        position: {
+            propHelp:
+`
+DEVWIDGET.widgetPosition()
+Returns an object with top and left positions for the widget.
+`,
+            methodHelp: 
+`
+DEVWIDGET.setWidgetPosition(position)
+    Moves the widget to a position on the screen.
+            position - A string or array with the new position of the widget. 
+                It can be px, em, rem or keywords like top, bottom, center, left, and or right.
+`
+        }
     }
+    
 }());
 
-// Data that is used to setup the widget
-let devData = {};
-
-// Initializes the Development Widget
-const initializeDevEnv = () => {
-    try {
-        if(typeof ENV === undefined || ENV !== 'DEV') return console.warn('Template enviorment is not set to DEV');
-    } catch (error) {
-        return console.warn(error);
-    }
-    // Parse the Raw HTML as HTML Document
-    const parser = new DOMParser();
-    const widgetHTML = parser.parseFromString(RAW_HTML, "text/html");
-    const styleHTML = parser.parseFromString(RAW_STYLES, "text/html");
-    const devControls = widgetHTML.querySelector('.dev-controller');
-    const style = styleHTML.querySelector('style');
-    const body = document.querySelector('body');
-    
-    //Append and load the Style Sheet
-    document.querySelector('head').append(style);
-    // Append Dev Controls Widget
-    body.append(devControls);
-
-    // Try to get and parse Dev Data
-    try {
-        if(!localStorage.length) throw new Error();
-        devData = JSON.parse(localStorage.getItem('devData'));
-    } catch(e) {
-        if(Object.keys(e).length) return console.log('Error finding Dev Data', e);
-        return console.warn(`
-Welcome to CasparCG HTML Developer Widget.
-To begin, simply click a playout command, enter a custom command, or set a background color using a HEX, RGB, or RGBA value.
-The position input can work with or without commas, a space is requred at minimum.`);
-    }
-
-    // If there is something in the devData object.
-    if(Object.keys(devData).length) {
-        if(devData.backgroundColor !== undefined) {
-            setBackgroundColor(devData.backgroundColor);
-        } 
-        if(devData.hideControls !== undefined && devData.hideControls) {
-            hideControls();
-        } else if(devData.shrinkControls !== undefined && devData.shrinkControls) {
-            shrinkControls();
-        }
-        if(devData.removeBackground !== undefined) removeBackground(devData.removeBackground); 
-        if(devData.customCommand) {
-            document.querySelector('#dev-custom-commands').value = devData.customCommand;
-        }
-        if(devData.position) {
-            moveWidget(devData.position);
-            // Sets the value of the select elements that position the widget
-            document.querySelector('.dev-controller .position').value = devData.position.reduce((acc, item, i) => {
-                acc += item.substring(0, 1).toUpperCase() + item.substring(1) + ', ';
-                if(i === devData.position.length - 1) acc = acc.slice(0, -2)
-                return acc;
-            }, '');
-        }
-    } else {
-        console.log('No Dev Data', devData)
-    }
-}
 
 // Sets the Background color of the body HTML Element
 // @param {object} e - Event oject
@@ -461,34 +634,6 @@ const runCustomCommand = () => {
     if(!devData.customCommand) return;
     if(typeof window[devData.customCommand] === 'function') return window[devData.customCommand]();
     return console.error(`Unable to execute ${devData.customCommand}`);
-}
-
-// Moves the widget to one of the corners or a custom position.info-con
-// @param {object} e - Event Obeject
-const moveWidget = (e) => {
-    const container = document.querySelector('.dev-controller');
-    let value = e.target ? e.target.value : e;
-    if(typeof value === 'string') {
-        value = value.includes(',') 
-            ? value.split(',').map(i => i.trim().toLowerCase())
-            : value.split(' ').map(i => i.trim().toLowerCase());
-    }
-    
-    if(value.includes('top')) {
-        container.style.top = '0px';
-        container.style.bottom = 'auto';
-    } else if(value.includes('bottom')) {
-        container.style.top = 'auto';
-        container.style.bottom = '0px';
-    }
-    if(value.includes('right')) {
-        container.style.right = '0px';
-        container.style.left = 'auto';
-    } else if(value.includes('left')) {
-        container.style.right = 'auto';
-        container.style.left = '0px';
-    }
-    return saveDevData({position: value});
 }
 
 // Shows the widget
@@ -585,42 +730,10 @@ const setElementProperties = data => {
 
 }
 
-// Compares two objects and returns a new update object
-// @param {object} obj1 - The new object
-// @param {obejct} obj2 - The old object to be updated
-// @returns {object} The updated object
-const compareObjects = (obj1, obj2) => {
-    if(!obj1 || !obj2 | !Object.keys(obj1).length) return false;
-    // Loop through each item in the new object
-    return Object.keys(obj1).reduce((acc, key) => {
-        // If the item is a string
-        if(typeof obj1[key] !== 'object' && !Array.isArray(obj1[key])) {
-            // If the item is not null and does not equal the old object
-            if(obj1[key] !== null && obj1[key] !== obj2[key]) {
-                acc[key] = obj1[key];
-            // If it is null, remove it
-            } else if(obj1[key] === null) {
-                delete acc[key];
-            }
-        // If the item is an array
-        } else if(Array.isArray(obj1[key])) {
-            acc[key] = obj1[key];
-        // If the item is an object
-        } else if(typeof obj1[key] === 'object') {
-            // Create or get the sub object to be compared to
-            const hasSubObject = obj2[key] ? obj2[key] : {};
-            // Compare the sub objects
-            acc[key] = compareObjects(obj1[key], hasSubObject);
-        }
-        return acc;
-    // Start with the old object
-    }, obj2);
-}
-
 // Compares the update sent and current data and saves it to local storage
 const saveDevData = (update) => {
     devData = compareObjects(update, devData);
-    localStorage.setItem('devData', JSON.stringify(devData));
+    localStorage.setItem('devController', JSON.stringify(devData));
 }
 
 // Adjusts colors based on a variabty of options

@@ -1,6 +1,6 @@
 'use strict';
 
-const ENV = 'DEV';
+const ENV = 'PROD';
 
 // Change DEV_SCRIPT_URL to the url the dev.js script will be served from 
 const DEV_SCRIPT_URL = 'http://localhost:3000/dev.js';

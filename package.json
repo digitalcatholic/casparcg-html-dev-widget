@@ -4,7 +4,8 @@
   "description": "A widget that makes developing CasparCg HTML templates easier",
   "main": "dev.js",
   "scripts": {
-    "httpserver": "http-server ./ -c-1 -d -p3000"
+    "httpserver": "http-server ./ -c-1 -d -p3000",
+    "SASS": "sass --watch .:."
   },
   "repository": {
     "type": "git",
